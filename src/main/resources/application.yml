@@ -22,3 +22,12 @@ spring:
               - StripPrefix=1
           #filters: 作用同上
           #  - RewritePath=/order/(?<segment>.*), /$\{segment}
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
