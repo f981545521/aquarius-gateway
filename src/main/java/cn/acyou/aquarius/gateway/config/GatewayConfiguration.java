@@ -113,7 +113,7 @@ public class GatewayConfiguration {
     private void initGatewayRules() {
         Set<GatewayFlowRule> rules = new HashSet<>();
         rules.add(new GatewayFlowRule("aquarius-order")
-                .setCount(1)
+                .setCount(10)
                 .setIntervalSec(1)
         );
 

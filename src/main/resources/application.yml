@@ -8,14 +8,14 @@ spring:
       routes:
         # 商品服务路由
         - id: aquarius-product
-          uri: http://192.168.1.95:12002
+          uri: lb://aquarius-product:12002
           predicates:
             - Path=/product/**
           filters:
             - StripPrefix=1
         # 订单服务路由
         - id: aquarius-order
-          uri: http://192.168.1.95:12001
+          uri: lb://aquarius-order:12001
           predicates:
             - Path=/order/**
           filters:
