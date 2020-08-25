@@ -1,0 +1,24 @@
+spring:
+  cloud:
+    gateway:
+      enabled: true
+      discovery:
+        locator:
+          lower-case-service-id: true
+      routes:
+        # 商品服务路由
+        - id: aquarius-product
+          uri: http://192.168.1.95:12002
+          predicates:
+            - Path=/product/**
+          filters:
+            - StripPrefix=1
+        # 订单服务路由
+        - id: aquarius-order
+          uri: http://192.168.1.95:12001
+          predicates:
+            - Path=/order/**
+          filters:
+              - StripPrefix=1
+          #filters: 作用同上
+          #  - RewritePath=/order/(?<segment>.*), /$\{segment}
