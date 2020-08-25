@@ -9,6 +9,8 @@ import com.alibaba.csp.sentinel.adapter.gateway.common.rule.GatewayFlowRule;
 import com.alibaba.csp.sentinel.adapter.gateway.common.rule.GatewayParamFlowItem;
 import com.alibaba.csp.sentinel.adapter.gateway.common.rule.GatewayRuleManager;
 import com.alibaba.csp.sentinel.adapter.gateway.sc.SentinelGatewayFilter;
+import com.alibaba.csp.sentinel.adapter.gateway.sc.callback.BlockRequestHandler;
+import com.alibaba.csp.sentinel.adapter.gateway.sc.callback.GatewayCallbackManager;
 import com.alibaba.csp.sentinel.adapter.gateway.sc.exception.SentinelGatewayBlockExceptionHandler;
 import com.alibaba.csp.sentinel.slots.block.RuleConstant;
 import org.slf4j.Logger;
@@ -19,14 +21,17 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerCodecConfigurer;
+import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.server.ServerResponse;
 import org.springframework.web.reactive.result.view.ViewResolver;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Mono;
 
 import javax.annotation.PostConstruct;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 /**
  * @author youfang
@@ -59,10 +64,25 @@ public class GatewayConfiguration {
         return new SentinelGatewayFilter();
     }
 
+
+
+
     @PostConstruct
     public void doInit() {
-        initCustomizedApis();
+        //initCustomizedApis();
         initGatewayRules();
+
+        //限流返回内容
+        GatewayCallbackManager.setBlockHandler(new BlockRequestHandler() {
+            @Override
+            public Mono<ServerResponse> handleRequest(ServerWebExchange serverWebExchange, Throwable throwable) {
+                Map<String, Object> res = new HashMap<>();
+                res.put("code", 571);
+                res.put("message", "访问过快，接口限流了！");
+                res.put("success", false);
+                return ServerResponse.status(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON_UTF8).body(BodyInserters.fromValue(res));
+            }
+        });
     }
 
 
@@ -71,27 +91,19 @@ public class GatewayConfiguration {
      */
     private void initCustomizedApis() {
         Set<ApiDefinition> definitions = new HashSet<>();
-        ApiDefinition apiProduct = new ApiDefinition("product_service_api")
+        ApiDefinition apiProduct = new ApiDefinition("order_detail_api")
                 .setPredicateItems(new HashSet<ApiPredicateItem>() {{
-                    add(new ApiPathPredicateItem().setPattern("/product/detail"));
-                    add(new ApiPathPredicateItem().setPattern("/product/**")
-                            .setMatchStrategy(SentinelGatewayConstants.URL_MATCH_STRATEGY_PREFIX));
+                    add(new ApiPathPredicateItem().setPattern("/order/test/detail"));
                 }});
-        ApiDefinition apiOrder = new ApiDefinition("order_service_api")
-                .setPredicateItems(new HashSet<ApiPredicateItem>() {{
-                    add(new ApiPathPredicateItem().setPattern("/order/**")
-                            .setMatchStrategy(SentinelGatewayConstants.URL_MATCH_STRATEGY_PREFIX));
-                }});
+
         ApiDefinition anotherApi = new ApiDefinition("another_api")
                 .setPredicateItems(new HashSet<ApiPredicateItem>() {{
                     add(new ApiPathPredicateItem().setPattern("/**")
                             .setMatchStrategy(SentinelGatewayConstants.URL_MATCH_STRATEGY_PREFIX));
                 }});
         definitions.add(apiProduct);
-        definitions.add(apiOrder);
         definitions.add(anotherApi);
         GatewayApiDefinitionManager.loadApiDefinitions(definitions);
-        log.info(" Sentinel API 分组统计 设置成功");
     }
 
     /**
@@ -100,23 +112,22 @@ public class GatewayConfiguration {
      */
     private void initGatewayRules() {
         Set<GatewayFlowRule> rules = new HashSet<>();
-        rules.add(new GatewayFlowRule("/order/**")
-                .setCount(2)
-                .setIntervalSec(2)
-                .setControlBehavior(RuleConstant.CONTROL_BEHAVIOR_DEFAULT)
+        rules.add(new GatewayFlowRule("aquarius-order")
+                .setCount(1)
+                .setIntervalSec(1)
         );
-
 
         //资源名称，可以是网关中的 route 名称或者用户自定义的 API 分组名称。
         rules.add(new GatewayFlowRule("aquarius-product")
                 //规则是针对 API Gateway 的 route（RESOURCE_MODE_ROUTE_ID）还是用户在 Sentinel 中定义的 API 分组（RESOURCE_MODE_CUSTOM_API_NAME），默认是 route。
-                .setResourceMode(SentinelGatewayConstants.RESOURCE_MODE_CUSTOM_API_NAME)
+                //.setResourceMode(SentinelGatewayConstants.RESOURCE_MODE_CUSTOM_API_NAME)
+                .setResourceMode(SentinelGatewayConstants.RESOURCE_MODE_ROUTE_ID)
                 //限流阈值
-                .setCount(2)
+                .setCount(1)
                 //统计时间窗口，单位是秒，默认是 1 秒。
-                .setIntervalSec(2)
+                .setIntervalSec(1)
                 //应对突发请求时额外允许的请求数目。
-                .setBurst(2)
+                .setBurst(1)
                 //流量整形的控制效果，同限流规则的 controlBehavior 字段，目前支持快速失败和匀速排队两种模式，默认是快速失败。
                 .setControlBehavior(RuleConstant.CONTROL_BEHAVIOR_RATE_LIMITER)
                 //匀速排队模式下的最长排队时间，单位是毫秒，仅在匀速排队模式下生效。
@@ -127,5 +138,6 @@ public class GatewayConfiguration {
                 )
         );
         GatewayRuleManager.loadRules(rules);
+
     }
 }
